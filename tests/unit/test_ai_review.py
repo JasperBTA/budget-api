@@ -1,11 +1,14 @@
 import json
 import subprocess
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import ai_review
+import httpx2
 import pytest
 from ai_review import Finding, Review, build_review_payload, collect_diff, commentable_lines
+from google.genai import errors
 
 PATCH = "\n".join(
     [
@@ -86,6 +89,7 @@ def env(monkeypatch: pytest.MonkeyPatch) -> None:
     }.items():
         monkeypatch.setenv(name, value)
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    monkeypatch.setenv("GEMINI_MODELS", "primary,fallback")  # tests never depend on the defaults
 
 
 def fake_gh(monkeypatch: pytest.MonkeyPatch, *responses: str | Exception) -> list[GhCall]:
@@ -140,7 +144,7 @@ def test_gemini_failure_skips_without_posting(
 
     assert ai_review.main() == 0
     assert len(calls) == 2  # files + rules, no review posted
-    assert "Gemini call failed: TimeoutError" in capsys.readouterr().out
+    assert "Gemini call failed: primary: TimeoutError" in capsys.readouterr().out
 
 
 def test_rejected_line_comment_retries_with_everything_in_the_body(
@@ -174,3 +178,109 @@ def test_posting_failure_skips(
 
     assert ai_review.main() == 0
     assert "posting the review failed: HTTP 403" in capsys.readouterr().out
+
+
+# --- fallback model (docs/design/0001-gemini-fallback-model.md) ---
+
+
+def api_error(code: int) -> errors.APIError:
+    body = {"error": {"code": code, "message": "m", "status": "S"}}
+    return errors.ServerError(code, body) if code >= 500 else errors.ClientError(code, body)
+
+
+def gemini_by_model(
+    results: dict[str, Review | Exception], calls: list[str]
+) -> Callable[..., Review]:
+    def ask(_key: str, model: str, _prompt: str) -> Review:
+        calls.append(model)
+        result = results[model]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    return ask
+
+
+REQUEST = httpx2.Request("POST", "https://generativelanguage.googleapis.com")
+# What the SDK really raises on its httpx2 backend, not only builtin exceptions.
+FALL_THROUGH = [
+    api_error(503),
+    api_error(504),
+    api_error(429),
+    api_error(408),
+    api_error(404),
+    httpx2.ReadTimeout("read timed out", request=REQUEST),
+    httpx2.ConnectError("connection refused", request=REQUEST),
+]
+
+
+@pytest.mark.parametrize("first_error", FALL_THROUGH, ids=lambda e: type(e).__name__)
+def test_transient_or_unknown_model_falls_back_to_the_next_model(
+    monkeypatch: pytest.MonkeyPatch, env: None, tmp_path: Path, first_error: Exception
+) -> None:
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    gh_calls = fake_gh(monkeypatch, FILES, "rules", "{}")
+    calls: list[str] = []
+    primary, fallback = "primary", "fallback"
+    monkeypatch.setattr(
+        ai_review, "ask_gemini", gemini_by_model({primary: first_error, fallback: REVIEW}, calls)
+    )
+
+    assert ai_review.main() == 0
+    assert calls == [primary, fallback]
+    posted = json.loads(gh_calls[2][1] or "")
+    assert f"`{fallback}`" in posted["body"]  # the header names the model that answered
+    line = summary.read_text().strip()
+    assert line.startswith(f"{primary}: {type(first_error).__name__}")
+    assert line.endswith(f"→ {fallback}: answered")
+
+
+@pytest.mark.parametrize(
+    "error",
+    [api_error(401), api_error(403), api_error(400), ValueError("invalid JSON in the answer")],
+)
+def test_key_request_or_answer_problems_skip_without_a_second_model(
+    monkeypatch: pytest.MonkeyPatch, env: None, capsys: pytest.CaptureFixture[str], error: Exception
+) -> None:
+    gh_calls = fake_gh(monkeypatch, FILES, "rules")
+    calls: list[str] = []
+    primary, fallback = "primary", "fallback"
+    monkeypatch.setattr(
+        ai_review, "ask_gemini", gemini_by_model({primary: error, fallback: REVIEW}, calls)
+    )
+
+    assert ai_review.main() == 0
+    assert calls == [primary]
+    assert len(gh_calls) == 2  # nothing posted
+    assert "AI review skipped" in capsys.readouterr().out
+
+
+def test_all_models_failing_skips_and_lists_each_error(
+    monkeypatch: pytest.MonkeyPatch, env: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_gh(monkeypatch, FILES, "rules")
+    primary, fallback = "primary", "fallback"
+    failures: dict[str, Review | Exception] = {primary: api_error(503), fallback: api_error(504)}
+    monkeypatch.setattr(ai_review, "ask_gemini", gemini_by_model(failures, []))
+
+    assert ai_review.main() == 0
+    out = capsys.readouterr().out
+    assert f"{primary}: ServerError: 503" in out and f"{fallback}: ServerError: 504" in out
+
+
+def test_gemini_models_overrides_the_order(monkeypatch: pytest.MonkeyPatch, env: None) -> None:
+    monkeypatch.setenv("GEMINI_MODELS", " b , a ")
+    fake_gh(monkeypatch, FILES, "rules", "{}")
+    calls: list[str] = []
+    monkeypatch.setattr(
+        ai_review, "ask_gemini", gemini_by_model({"b": api_error(503), "a": REVIEW}, calls)
+    )
+
+    assert ai_review.main() == 0
+    assert calls == ["b", "a"]
+
+
+def test_empty_override_falls_back_to_the_default_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GEMINI_MODELS", " , ")
+    assert ai_review.models() == list(ai_review.DEFAULT_MODELS)

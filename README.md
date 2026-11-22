@@ -102,10 +102,12 @@ Alembic migrations, and each test runs in a transaction that is rolled back.
 
 ## AI review on pull requests
 
-Every pull request gets an advisory review from Gemini (`gemini-4-hydrogen`), checked against
+Every pull request gets an advisory review from Gemini (`gemini-4-hydrogen`, falling back to
+`gemini-3.5-flash-lite` when it is unavailable, rate-limited or unknown; see
+[design 0001](docs/design/0001-gemini-fallback-model.md)), checked against
 the rules in [`AGENTS.md`](AGENTS.md) from the base branch. Findings appear as line comments.
 The required gate stays CI (ruff, mypy, pytest): if the key is missing, the quota is used up or
-the API keeps failing after 4 attempts with backoff, the review is skipped with a note and never blocks a merge.
+the API keeps failing after 3 attempts with backoff on each model, the review is skipped with a note and never blocks a merge.
 
 Setup for a fork: add a Gemini API key from [Google AI Studio](https://aistudio.google.com) as
 the repository secret `GEMINI_API_KEY`. Anyone who can push a branch to the repo can read that

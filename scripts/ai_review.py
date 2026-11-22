@@ -15,12 +15,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-DEFAULT_MODEL = "gemini-4-hydrogen"
+# Tried in order; GEMINI_MODELS (comma-separated) overrides it. See docs/design/0001.
+DEFAULT_MODELS = ("gemini-4-hydrogen", "gemini-3.5-flash-lite")
 # shortcut: larger diffs are cut off; split the PR if reviews start missing the end of it.
 MAX_DIFF_CHARS = 200_000
-GEMINI_TIMEOUT_MS = 120_000
-# Free-tier keys get 503 "high demand" spikes; back off 10 s, 20 s, 40 s before giving up.
-GEMINI_ATTEMPTS = 4
+GEMINI_TIMEOUT_MS = 90_000  # 2 models x 3 attempts x 90 s + backoff ≈ 10 min of the 15
+# Free-tier keys get 503 "high demand" spikes; back off 10 s, 20 s per model before moving on.
+GEMINI_ATTEMPTS = 3
+# Unknown model, timeout, rate limit: another model may still answer.
+FALLTHROUGH_CODES = {404, 408, 429}
 HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
@@ -127,18 +130,37 @@ def ask_gemini(api_key: str, model: str, prompt: str) -> Review:
     return Review.model_validate_json(response.text or "")
 
 
+def falls_through(exc: Exception) -> bool:
+    """True when the next model may succeed; False when the request or key itself is wrong."""
+    import httpx2
+    from google.genai import errors
+
+    if isinstance(exc, errors.APIError):
+        return exc.code in FALLTHROUGH_CODES or exc.code >= 500
+    return isinstance(exc, httpx2.TransportError | TimeoutError)
+
+
+def models() -> list[str]:
+    configured = os.environ.get("GEMINI_MODELS", "")
+    return [name.strip() for name in configured.split(",") if name.strip()] or list(DEFAULT_MODELS)
+
+
 def gh(*args: str, stdin: str | None = None) -> str:
     return subprocess.run(
         ["gh", *args], input=stdin, capture_output=True, text=True, check=True
     ).stdout
 
 
-def skip(reason: str) -> int:
-    message = f"AI review skipped: {reason}"
+def note(message: str) -> None:
+    """Print to the log and to the job summary on the PR's Checks tab."""
     print(message)
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(summary).open("a") as file:
             file.write(message + "\n")
+
+
+def skip(reason: str) -> int:
+    note(f"AI review skipped: {reason}")
     return 0
 
 
@@ -147,7 +169,6 @@ def main() -> int:
     if not api_key:
         return skip("GEMINI_API_KEY is not set")
     repo, pr = os.environ["REPO"], os.environ["PR_NUMBER"]
-    model = os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
 
     try:
         pages = json.loads(gh("api", "--paginate", "--slurp", f"repos/{repo}/pulls/{pr}/files"))
@@ -164,10 +185,20 @@ def main() -> int:
     if not diff:
         return skip("no changed files")
 
-    try:
-        review = ask_gemini(api_key, model, build_prompt(rules, diff[:MAX_DIFF_CHARS]))
-    except Exception as exc:  # advisory: quota, outage, timeout or a malformed answer all skip
-        return skip(f"Gemini call failed: {type(exc).__name__}: {exc}")
+    prompt = build_prompt(rules, diff[:MAX_DIFF_CHARS])
+    tried: list[str] = []
+    review: Review | None = None
+    for model in models():
+        try:
+            review = ask_gemini(api_key, model, prompt)
+            break
+        except Exception as exc:  # advisory: no failure may turn the job red
+            tried.append(f"{model}: {type(exc).__name__}: {str(exc)[:200]}")
+            if not falls_through(exc):
+                break
+    if review is None:
+        return skip("Gemini call failed: " + " → ".join(tried))
+    note(" → ".join([*tried, f"{model}: answered"]))
 
     error = ""
     # GitHub rejects the whole review if one line comment is invalid: retry with all in the body.
