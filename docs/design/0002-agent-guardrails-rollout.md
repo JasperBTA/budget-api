@@ -112,8 +112,9 @@ Follow-up outside the plan: [design 0001](0001-gemini-fallback-model.md),
 - [x] A `ruff` error after an edit goes back to the agent (fired live while #3 was written).
 - [x] Editing migration `0001` is denied by the hook (pipe-tested; CI diff check added in #3).
 - [x] A Gemini review appears on a PR (#1, #5).
-- [ ] A Gemini review cites an `AGENTS.md` rule: the two posted reviews had one false positive
-      (#1) and no findings (#5).
+- [x] A Gemini review cites an `AGENTS.md` rule: on the planted-bug PR
+      [#7](https://github.com/JasperBTA/budget-api/pull/7) it cited business rule 1.
+      (Earlier reviews: one false positive on #1, no findings on #5.)
 - [x] When the API fails, the job ends green with a skip note (live on #1–#4); without a key it
       skips too (`tests/unit/test_ai_review.py::test_missing_key_skips`).
 - [x] A non-collaborator cannot open a PR (`pull_request_creation_policy: collaborators_only`).
@@ -121,4 +122,6 @@ Follow-up outside the plan: [design 0001](0001-gemini-fallback-model.md),
       on the agent's side as destructive and not repeated.
 - [ ] `git commit` from the agent asks for approval: the rule exists; to be confirmed in a fresh
       session.
-- [ ] A PR with a planted bug gets a Gemini comment on that line: not run yet.
+- [x] A PR with a planted bug gets a Gemini comment on that line: #7 (money as `float`) got
+      line comments on `reports.py:49` and `schemas.py:110` while CI was green. The missing test
+      in the same PR was not flagged.

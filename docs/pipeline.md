@@ -61,6 +61,7 @@ human, so it is the gate.
 | [#3](https://github.com/JasperBTA/budget-api/pull/3) Hooks | The lint hook fired live while the PR was written (`E501` returned to the agent). The review found that nothing in CI caught an edited merged migration; a CI diff step was added. |
 | [#4](https://github.com/JasperBTA/budget-api/pull/4) Reviewer subagent | Review found that "read-only" was only a request, since the reviewer has Bash. It became a hook in the subagent's header; writing its tests caught two bugs in the guard itself. |
 | [#5](https://github.com/JasperBTA/budget-api/pull/5) Fallback model | Designed with `/design-doc` and approved before code ([design 0001](design/0001-gemini-fallback-model.md)); first live run of the `reviewer` subagent. On the PR the primary model returned `429 quota`, and the fallback model answered and posted the review. |
+| [#7](https://github.com/JasperBTA/budget-api/pull/7) Planted bug (closed, not merged) | A monthly-report field computed money as `float`, against business rule 1, with no test. CI was green: ruff, mypy and all 134 tests passed. The Gemini review (fallback model, after a `503`) flagged the `float` on both changed lines, citing rule 1. It did not flag the missing test. |
 
 ## When something fails
 
