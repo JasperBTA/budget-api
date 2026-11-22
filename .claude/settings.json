@@ -1,6 +1,11 @@
 {
   "permissions": {
-    "ask": ["Bash(git commit *)", "Bash(git push *)"]
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git -C * commit *)",
+      "Bash(git -C * push *)"
+    ]
   },
   "hooks": {
     "PreToolUse": [
@@ -9,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --frozen --quiet python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_migrations.py\"",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_migrations.py\"",
             "timeout": 30
           }
         ]
@@ -21,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --frozen --quiet python \"$CLAUDE_PROJECT_DIR/.claude/hooks/lint_changed_file.py\"",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lint_changed_file.py\"",
             "timeout": 60,
             "statusMessage": "ruff on the changed file"
           }
@@ -33,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --frozen --quiet python \"$CLAUDE_PROJECT_DIR/.claude/hooks/check_on_stop.py\"",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/check_on_stop.py\"",
             "timeout": 300,
             "statusMessage": "mypy + architecture and unit tests"
           }
