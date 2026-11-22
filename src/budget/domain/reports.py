@@ -45,3 +45,8 @@ class MonthlyReport:
     @property
     def balance(self) -> Decimal:
         return self.income - self.expenses
+
+    @property
+    def average_expense(self) -> float:
+        expense_lines = [line for line in self.lines if line.kind is CategoryKind.EXPENSE]
+        return float(self.expenses) / len(expense_lines) if expense_lines else 0.0

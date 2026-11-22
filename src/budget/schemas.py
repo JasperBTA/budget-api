@@ -107,4 +107,5 @@ class MonthlyReportOut(ORMModel):
     income: Decimal
     expenses: Decimal
     balance: Decimal
+    average_expense: float
     lines: list[CategoryLineOut]
