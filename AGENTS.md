@@ -56,6 +56,9 @@ Relative imports are banned (ruff `TID252`) so that test sees every import.
 - **No repository layer.** The `Session` already is the unit of work and repository. Add an
   abstraction only when there is a second implementation to justify it.
 - **Pure logic goes to `domain/`** and gets unit tests without a database.
+- **Decisions with a recorded reason** are in `docs/adr/` (repository layer, 404 vs 403,
+  `Decimal`, sync SQLAlchemy). Read the relevant ADR before changing that code; reversing one
+  needs a new ADR, not a quiet edit.
 
 ## Business rules (do not break)
 
