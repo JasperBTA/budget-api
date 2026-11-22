@@ -19,6 +19,8 @@ DEFAULT_MODEL = "gemini-4-hydrogen"
 # shortcut: larger diffs are cut off; split the PR if reviews start missing the end of it.
 MAX_DIFF_CHARS = 200_000
 GEMINI_TIMEOUT_MS = 120_000
+# Free-tier keys get 503 "high demand" spikes; back off 10 s, 20 s, 40 s before giving up.
+GEMINI_ATTEMPTS = 4
 HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
@@ -107,7 +109,13 @@ def ask_gemini(api_key: str, model: str, prompt: str) -> Review:
     from google.genai import types
 
     client = genai.Client(
-        api_key=api_key, http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT_MS)
+        api_key=api_key,
+        http_options=types.HttpOptions(
+            timeout=GEMINI_TIMEOUT_MS,
+            retry_options=types.HttpRetryOptions(
+                attempts=GEMINI_ATTEMPTS, initial_delay=10, max_delay=60
+            ),
+        ),
     )
     response = client.models.generate_content(
         model=model,

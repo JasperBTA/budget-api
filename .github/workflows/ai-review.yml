@@ -18,7 +18,7 @@ jobs:
   review:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15  # 4 attempts x 120 s timeout + backoff fits inside
     steps:
       - uses: actions/checkout@v4
         with:
