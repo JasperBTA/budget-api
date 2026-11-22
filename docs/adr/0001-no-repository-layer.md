@@ -1,6 +1,6 @@
 # ADR 0001 — No repository layer
 
-Status: accepted · 2026-11-22
+Status: accepted · recorded 2026-11-22 (decision taken in the initial commits)
 
 ## Context
 

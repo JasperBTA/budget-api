@@ -1,6 +1,6 @@
 # ADR 0004 — Synchronous SQLAlchemy
 
-Status: accepted · 2026-11-22
+Status: accepted · recorded 2026-11-22 (decision taken in the initial commits)
 
 ## Context
 
@@ -19,5 +19,6 @@ thread pool.
 - Throughput is bounded by the thread pool and the connection pool, which is ample for this
   workload.
 - Revisit if an endpoint has to wait on slow external calls, or if load tests show the thread
-  pool as the bottleneck; the service layer takes plain values, so the change would stay
-  inside `db.py`, `services/` and the routers.
+  pool as the bottleneck. Services take plain values, so the change would stay in the
+  database plumbing: `db.py`, `services/`, the routers, `api/deps.py` and the test fixtures in
+  `tests/conftest.py`.
