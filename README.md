@@ -93,12 +93,25 @@ uv run uvicorn budget.main:app --reload
 Checks (same as CI):
 
 ```bash
-uv run ruff check . && uv run ruff format --check . && uv run mypy src tests && uv run pytest
+uv run ruff check . && uv run ruff format --check . && uv run mypy src tests scripts && uv run pytest
 ```
 
 Tests run against a real PostgreSQL database (`budget_test`, created on the first start of the
 `db` volume; with an older volume run `docker compose down -v` once). The schema is built by the actual
 Alembic migrations, and each test runs in a transaction that is rolled back.
+
+## AI review on pull requests
+
+Every pull request gets an advisory review from Gemini (`gemini-4-hydrogen`), checked against
+the rules in [`AGENTS.md`](AGENTS.md) from the base branch. Findings appear as line comments.
+The required gate stays CI (ruff, mypy, pytest): if the key is missing, the quota is used up or
+the API keeps failing after 4 attempts with backoff, the review is skipped with a note and never blocks a merge.
+
+Setup for a fork: add a Gemini API key from [Google AI Studio](https://aistudio.google.com) as
+the repository secret `GEMINI_API_KEY`. Anyone who can push a branch to the repo can read that
+secret from a workflow, so use a free-tier key without billing.
+Code: [`scripts/ai_review.py`](scripts/ai_review.py),
+[`.github/workflows/ai-review.yml`](.github/workflows/ai-review.yml).
 
 ## Working with AI agents
 

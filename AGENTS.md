@@ -19,7 +19,7 @@ docker compose up -d db                   # Postgres for dev + tests (creates bu
 uv run alembic upgrade head               # migrate dev DB
 uv run uvicorn budget.main:app --reload   # run (needs JWT_SECRET, see .env.example)
 
-uv run ruff check . && uv run ruff format --check . && uv run mypy src tests && uv run pytest
+uv run ruff check . && uv run ruff format --check . && uv run mypy src tests scripts && uv run pytest
 ```
 
 The last line is the definition of "it works". CI runs exactly that.
@@ -33,6 +33,9 @@ src/budget/
   domain/     Pure Python: calculations, value rules. No I/O, no framework imports.
   models.py   SQLAlchemy tables.        schemas.py  Pydantic request/response models.
   errors.py   Domain exceptions.        main.py     App, routers, error -> HTTP mapping.
+scripts/
+  ai_review.py  Gemini PR review run by CI (.github/workflows/ai-review.yml). Not part of the
+                app: it never imports `budget`, and the app never imports it.
 ```
 
 Dependency direction is one way: `api -> services -> domain`. Never the reverse.
@@ -110,8 +113,8 @@ Dependency direction is one way: `api -> services -> domain`. Never the reverse.
 
 - Every business rule above has at least one test. A bug fix starts with a failing test.
 - Rules enforced by the database (rule 6) get a test that bypasses the app and hits the DB directly.
-- `tests/unit/`: pure `domain/` logic, no DB, parametrized edge cases (rounding, month rollover,
-  limit boundaries).
+- `tests/unit/`: pure logic without a DB: `domain/` (rounding, month rollover, limit boundaries)
+  and `scripts/` (diff parsing, the review's skip paths, with `gh` and Gemini faked).
 - `tests/api/`: through HTTP with `TestClient` against **real PostgreSQL** (`budget_test`), never
   SQLite: constraints and `Numeric` behave differently there.
 - Each test runs in a rolled-back transaction (see `tests/conftest.py`); tests are independent and
