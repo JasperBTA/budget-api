@@ -133,10 +133,10 @@ Relative imports are banned (ruff `TID252`) so that test sees every import.
 
 | When | What runs | Effect |
 |------|-----------|--------|
-| Before an edit | `.claude/hooks/guard_migrations.py` | Editing a migration already on `origin/main` is denied |
+| Before an edit | `.claude/hooks/guard_migrations.py` | Editing a migration already on `origin/main` is denied (early feedback; CI rejects any PR that edits, renames or deletes one) |
 | After an edit | `.claude/hooks/lint_changed_file.py` | `ruff` errors in the edited file go back to the agent to fix |
-| Before the turn ends | `.claude/hooks/check_on_stop.py` | If Python changed: `mypy` and the database-free tests must pass |
-| `git commit`, `git push` | `permissions.ask` | Always asks the human first |
+| Before the turn ends | `.claude/hooks/check_on_stop.py` | If Python files differ from `HEAD`: `mypy` and the database-free tests; a failure sends the agent back once, then CI is the gate |
+| `git commit`, `git push` | `permissions.ask` | Asks the human first (also for `git -C <dir> ...`) |
 
 ## Workflow for an agent
 
