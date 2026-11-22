@@ -19,7 +19,7 @@ from budget.main import app
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def schema() -> None:
     """Build the schema with the real migrations, so a broken migration fails the suite."""
     config = Config(ALEMBIC_INI)
@@ -29,7 +29,7 @@ def schema() -> None:
 
 
 @pytest.fixture
-def session() -> Iterator[Session]:
+def session(schema: None) -> Iterator[Session]:
     """Each test runs inside a transaction that is rolled back; commits become savepoints."""
     with engine.connect() as connection:
         transaction = connection.begin()

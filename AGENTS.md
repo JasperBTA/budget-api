@@ -39,6 +39,9 @@ scripts/
 ```
 
 Dependency direction is one way: `api -> services -> domain`. Never the reverse.
+`tests/test_architecture.py` enforces the import rules below (all but the "type hints only" note)
+and that shared top-level modules never import `api/` or `services/`; change both together.
+Relative imports are banned (ruff `TID252`) so that test sees every import.
 
 | Layer       | May import                                             | Must not                            |
 |-------------|--------------------------------------------------------|-------------------------------------|
@@ -113,6 +116,8 @@ Dependency direction is one way: `api -> services -> domain`. Never the reverse.
 
 - Every business rule above has at least one test. A bug fix starts with a failing test.
 - Rules enforced by the database (rule 6) get a test that bypasses the app and hits the DB directly.
+- `tests/unit/` and `tests/test_architecture.py` run without a database; only fixtures that need it
+  (`session`, `client`) build the schema.
 - `tests/unit/`: pure logic without a DB: `domain/` (rounding, month rollover, limit boundaries)
   and `scripts/` (diff parsing, the review's skip paths, with `gh` and Gemini faked).
 - `tests/api/`: through HTTP with `TestClient` against **real PostgreSQL** (`budget_test`), never
