@@ -20,9 +20,10 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.28",
     "ruff>=0.8",
     "mypy>=1.13",
+    "google-genai>=3.6.1",
+    "httpx2>=2.16.2",
 ]
 
 [build-system]
@@ -46,7 +47,9 @@ ban-relative-imports = "all"
 [tool.mypy]
 strict = true
 plugins = ["pydantic.mypy"]
+mypy_path = "scripts"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["scripts"]
 addopts = "-ra"
