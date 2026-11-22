@@ -1,6 +1,6 @@
 # 0002 — Agent guardrails and Gemini PR review (rollout plan)
 
-Status: approved 2026-11-22 · implemented in PRs #1–#4 and the PR that adds this file.
+Status: approved 2026-11-22 · implemented in PRs #1–#4 and #6.
 Written before 0001 (in a shared doc, moved here in step 6); numbered by arrival in the repo.
 
 ## Goal and context
@@ -55,7 +55,7 @@ flowchart LR
 ```
 
 The agent stays inside its steps: no code without approval, nothing reaches GitHub until the
-human says so ("wrzuć na gita"), and only the human merges.
+human asks for the push, and only the human merges.
 
 ## Alternatives and decisions
 
@@ -66,7 +66,7 @@ human says so ("wrzuć na gita"), and only the human merges.
 | Architecture test | Own test on `ast` | `import-linter` | No new dependency or config; short enough to read |
 | When `mypy` runs in hooks | End of the agent's turn | After every edit | `mypy` takes seconds; `ruff` is instant |
 | Git approval | Ask (`permissions.ask`) | Hard block | A block would also stop the push the human asked for |
-| Gemini integration | Own script on the API | Antigravity CLI; Gemini Code Assist enterprise | The consumer Code Assist GitHub app was shut down in 2026; enterprise needs a paid licence; an own script shows the most |
+| Gemini integration | Own script on the API | Antigravity CLI; Gemini Code Assist enterprise | The consumer Code Assist GitHub app was shut down in 2026; enterprise needs a paid licence; an own script needs no licence and gives full control of the prompt and the failure handling |
 | Review form | One PR review with line comments | One summary comment | Reads like a human review; findings outside the diff go to the summary |
 | Does Gemini block merge | No, advisory | Required check | API limits could lock the repo; the gate is CI |
 
@@ -76,7 +76,7 @@ Cost is about $0: Actions are free for public repos and the review runs on a fre
 
 | Risk | Mitigation |
 | --- | --- |
-| Prompt injection in the diff | The workflow token has `pull-requests: write` only; the model can comment, never change code; rules come from the base branch |
+| Prompt injection in the diff | The workflow token has only `contents: read` and `pull-requests: write`; the model can comment, never change code; rules come from the base branch |
 | Missing API key, quota or outage | Green skip with a note; the review never blocks merge |
 | Hooks run only in Claude Code | CI checks the same rules; hooks are the fast loop, CI is the gate |
 | Free-tier data may be used for training | The repo is public; secrets are never sent |
@@ -90,7 +90,7 @@ Cost is about $0: Actions are free for public repos and the review runs on a fre
 | 3. Architecture test | [#2](https://github.com/JasperBTA/budget-api/pull/2) | Layer table enforced; unit tests no longer need Postgres |
 | 4. Hooks | [#3](https://github.com/JasperBTA/budget-api/pull/3) | Hooks live; CI step added for merged migrations |
 | 5. Reviewer subagent and commands | [#4](https://github.com/JasperBTA/budget-api/pull/4) | Reviewer read-only enforced by a hook in its header |
-| 6. ADRs and process docs | this PR | `docs/adr/`, `docs/design/`, `docs/pipeline.md`, README |
+| 6. ADRs and process docs | [#6](https://github.com/JasperBTA/budget-api/pull/6) | `docs/adr/`, `docs/design/`, `docs/pipeline.md`, README |
 
 Follow-up outside the plan: [design 0001](0001-gemini-fallback-model.md),
 [#5](https://github.com/JasperBTA/budget-api/pull/5), a fallback model after the primary answered
@@ -111,8 +111,11 @@ Follow-up outside the plan: [design 0001](0001-gemini-fallback-model.md),
 - [x] Importing `fastapi` in `domain/` fails `pytest` (probed in #2).
 - [x] A `ruff` error after an edit goes back to the agent (fired live while #3 was written).
 - [x] Editing migration `0001` is denied by the hook (pipe-tested; CI diff check added in #3).
-- [x] A Gemini review appears on a PR and cites `AGENTS.md` rules (#1, #5).
-- [x] Without a key, or when the API fails, the job ends green with a skip note (#1–#4).
+- [x] A Gemini review appears on a PR (#1, #5).
+- [ ] A Gemini review cites an `AGENTS.md` rule: the two posted reviews had one false positive
+      (#1) and no findings (#5).
+- [x] When the API fails, the job ends green with a skip note (live on #1–#4); without a key it
+      skips too (`tests/unit/test_ai_review.py::test_missing_key_skips`).
 - [x] A non-collaborator cannot open a PR (`pull_request_creation_policy: collaborators_only`).
 - [ ] A force push is rejected by GitHub: the ruleset is active, but a live attempt was blocked
       on the agent's side as destructive and not repeated.

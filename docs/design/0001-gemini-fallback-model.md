@@ -87,7 +87,9 @@ One PR (`feat/gemini-fallback`): script, tests, README, this document.
 ## 7. Open questions
 
 1. **Fallback model id.** Sources name the free Flash-Lite model `gemini-3.5-flash-lite`, but no
-   official page confirmed the id. Recommendation: use it, and let the first live run on this PR
-   confirm it (a wrong id is a skip, not a failure).
+   official page confirmed the id. Recommendation: use it, and let the first live run on the PR
+   confirm it (a wrong id is a skip, not a failure). **Resolved on
+   [#5](https://github.com/JasperBTA/budget-api/pull/5):** the primary returned `429` and
+   `gemini-3.5-flash-lite` answered and posted the review.
 2. **A third model?** Recommendation: no. Two cover an overloaded primary; a third mostly adds
    runner time. Revisit if skips stay above 1 in 3 PRs over the next week.
