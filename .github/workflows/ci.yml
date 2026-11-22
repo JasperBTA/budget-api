@@ -22,6 +22,13 @@ jobs:
           --health-retries 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the base branch is needed to compare migrations
+      - name: Merged migrations are never edited, renamed or deleted
+        if: github.event_name == 'pull_request'
+        run: >-
+          git diff --exit-code --name-status --diff-filter=MDR
+          origin/${{ github.base_ref }}...HEAD -- migrations/versions
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
       - run: uv run ruff check .

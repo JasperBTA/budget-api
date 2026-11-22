@@ -126,6 +126,18 @@ Relative imports are banned (ruff `TID252`) so that test sees every import.
   order-free. Use the `alice` / `bob` fixtures; every new endpoint gets a user-isolation test.
 - Assert on exact values (`"12.50"`), not just status codes.
 
+## Guardrails for Claude Code
+
+`.claude/settings.json` turns some of these rules into checks that run while the agent works
+(tested in `tests/test_hooks.py`; CI still checks everything, for any agent or human):
+
+| When | What runs | Effect |
+|------|-----------|--------|
+| Before an edit | `.claude/hooks/guard_migrations.py` | Editing a migration already on `origin/main` is denied (early feedback; CI rejects any PR that edits, renames or deletes one) |
+| After an edit | `.claude/hooks/lint_changed_file.py` | `ruff` errors in the edited file go back to the agent to fix |
+| Before the turn ends | `.claude/hooks/check_on_stop.py` | If Python files differ from `HEAD`: `mypy` and the database-free tests; a failure sends the agent back once, then CI is the gate |
+| `git commit`, `git push` | `permissions.ask` | Asks the human first (also for `git -C <dir> ...`) |
+
 ## Workflow for an agent
 
 1. Read the files you will touch and their tests before editing.
