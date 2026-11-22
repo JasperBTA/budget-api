@@ -2,10 +2,13 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[1]
 HOOKS = ROOT / ".claude" / "hooks"
@@ -93,14 +96,58 @@ def test_failing_check_on_stop_sends_the_agent_back(tmp_path: Path) -> None:
     assert "fix it before finishing" in result.stderr
 
 
-def test_every_hook_in_settings_points_at_an_existing_script() -> None:
-    # A renamed script would otherwise make its hook silently stop firing.
-    settings = json.loads((ROOT / ".claude" / "settings.json").read_text())
-    commands = [
-        hook["command"]
-        for groups in settings["hooks"].values()
-        for group in groups
-        for hook in group["hooks"]
-    ]
-    scripts = [command.split('"$CLAUDE_PROJECT_DIR/')[1].rstrip('"') for command in commands]
-    assert scripts and all((ROOT / script).is_file() for script in scripts)
+def test_every_hook_points_at_an_existing_script() -> None:
+    # A renamed script would otherwise make its hook silently stop firing. Hooks live in
+    # settings.json and in subagent headers (.claude/agents/*.md).
+    sources = [ROOT / ".claude" / "settings.json", *(ROOT / ".claude" / "agents").glob("*.md")]
+    scripts = {
+        match
+        for source in sources
+        for match in re.findall(r"\.claude/hooks/[\w.-]+\.py", source.read_text())
+    }
+    assert len(scripts) >= 4
+    assert all((ROOT / script).is_file() for script in scripts), scripts
+
+
+READ_ONLY = [
+    "git status --short && git diff",
+    "git log --oneline -5 | head -3",
+    "uv run pytest -q tests/unit 2>&1 | tail -1",
+    "uv run ruff check . && uv run ruff format --check .",
+    "uv run mypy src tests scripts >/dev/null",
+    "grep -in 'session' src/budget/api/deps.py",
+    "sed -n '1,20p' AGENTS.md",
+    "uv run python -c 'import budget.domain.months as m; print(m.next_month)'",
+]
+WRITING = [
+    "rm -rf src",
+    "git checkout -- .",
+    "git stash",
+    "git diff --output=patch.diff",
+    "sed -i '' 's/a/b/' AGENTS.md",
+    "uv run ruff check --fix .",
+    "uv run ruff format .",
+    "echo x > AGENTS.md",
+    "cat $(echo AGENTS.md)",
+    "find . -name '*.pyc' -delete",
+    "uv add requests",
+    "git status; touch x",
+]
+
+
+@pytest.mark.parametrize("command", READ_ONLY)
+def test_reviewer_guard_allows_read_only_commands(command: str) -> None:
+    result = run(
+        "guard_readonly_bash.py", {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert (result.returncode, result.stdout) == (0, "")
+
+
+@pytest.mark.parametrize("command", WRITING)
+def test_reviewer_guard_denies_writes(command: str) -> None:
+    result = run(
+        "guard_readonly_bash.py", {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    decision = json.loads(result.stdout)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"
+    assert decision["permissionDecisionReason"].startswith("Reviewer is read-only")
