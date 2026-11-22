@@ -107,7 +107,8 @@ Every pull request gets an advisory review from Gemini (`gemini-4-hydrogen`, fal
 [design 0001](docs/design/0001-gemini-fallback-model.md)), checked against
 the rules in [`AGENTS.md`](AGENTS.md) from the base branch. Findings appear as line comments.
 The required gate stays CI (ruff, mypy, pytest): if the key is missing, the quota is used up or
-the API keeps failing after 3 attempts with backoff on each model, the review is skipped with a note and never blocks a merge.
+the API keeps failing after 3 attempts with backoff on each model, the review is skipped with a
+note and never blocks a merge.
 
 Setup for a fork: add a Gemini API key from [Google AI Studio](https://aistudio.google.com) as
 the repository secret `GEMINI_API_KEY`. Anyone who can push a branch to the repo can read that
@@ -115,8 +116,20 @@ secret from a workflow, so use a free-tier key without billing.
 Code: [`scripts/ai_review.py`](scripts/ai_review.py),
 [`.github/workflows/ai-review.yml`](.github/workflows/ai-review.yml).
 
-## Working with AI agents
+## How this repo is built
 
-[`AGENTS.md`](AGENTS.md) defines the architecture boundaries, business rules, conventions and the
-definition of done that coding agents must follow (`CLAUDE.md` imports it). It is written so that
-a change can be checked against it during review.
+The code is written by a coding agent (Claude Code) under rules that machines check, with a
+human approving the design, the push and the merge. **Start with
+[`docs/pipeline.md`](docs/pipeline.md)**: the path of a change, what enforces each rule, and the
+pull requests where the checks caught something.
+
+| What | Where |
+| --- | --- |
+| Rules every agent and human follows | [`AGENTS.md`](AGENTS.md) (`CLAUDE.md` imports it) |
+| Checks while the agent works | [`.claude/settings.json`](.claude/settings.json), [`.claude/hooks/`](.claude/hooks/) |
+| Read-only reviewer subagent | [`.claude/agents/reviewer.md`](.claude/agents/reviewer.md) |
+| Commands: design doc first, new endpoint checklist | [`.claude/commands/`](.claude/commands/) |
+| Layer rules as a test | [`tests/test_architecture.py`](tests/test_architecture.py) |
+| Design docs, approved before code | [`docs/design/`](docs/design/) |
+| Architecture decisions and their reasons | [`docs/adr/`](docs/adr/) |
+| Pull request history with reviews and fixes | [Pull requests](https://github.com/JasperBTA/budget-api/pulls?q=is%3Apr) |
