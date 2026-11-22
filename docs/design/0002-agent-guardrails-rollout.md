@@ -118,10 +118,11 @@ Follow-up outside the plan: [design 0001](0001-gemini-fallback-model.md),
 - [x] When the API fails, the job ends green with a skip note (live on #1–#4); without a key it
       skips too (`tests/unit/test_ai_review.py::test_missing_key_skips`).
 - [x] A non-collaborator cannot open a PR (`pull_request_creation_policy: collaborators_only`).
-- [ ] A force push is rejected by GitHub: the ruleset is active, but a live attempt was blocked
-      on the agent's side as destructive and not repeated.
-- [ ] `git commit` from the agent asks for approval: the rule exists; to be confirmed in a fresh
-      session.
+- [x] A force push is rejected by GitHub: tested on 2026-11-22 with the owner's approval, by
+      amending a pushed commit on the PR branch; GitHub answered `GH013: Repository rule
+      violations … Cannot force-push to this branch` and the branch stayed unchanged.
+- [x] `git commit` and `git push` from the agent ask for approval: confirmed by the owner in a
+      fresh session (the rule only loaded after a restart).
 - [x] A PR with a planted bug gets a Gemini comment on that line: #7 (money as `float`) got
       line comments on `reports.py:49` and `schemas.py:110` while CI was green. The missing test
       in the same PR was not flagged.
