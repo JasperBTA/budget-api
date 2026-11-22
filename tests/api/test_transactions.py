@@ -74,7 +74,7 @@ def test_filter_by_month_and_newest_first(
     [{"month": "2026-13"}, {"month": "9999-12"}, {"limit": 0}, {"limit": 101}, {"offset": 10**19}],
 )
 def test_invalid_query_params_are_422(
-    client: TestClient, alice: dict[str, str], params: dict[str, object]
+    client: TestClient, alice: dict[str, str], params: dict[str, str | int]
 ) -> None:
     assert client.get("/transactions", params=params, headers=alice).status_code == 422
 
