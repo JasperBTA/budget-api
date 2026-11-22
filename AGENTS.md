@@ -136,12 +136,23 @@ Relative imports are banned (ruff `TID252`) so that test sees every import.
 | Before an edit | `.claude/hooks/guard_migrations.py` | Editing a migration already on `origin/main` is denied (early feedback; CI rejects any PR that edits, renames or deletes one) |
 | After an edit | `.claude/hooks/lint_changed_file.py` | `ruff` errors in the edited file go back to the agent to fix |
 | Before the turn ends | `.claude/hooks/check_on_stop.py` | If Python files differ from `HEAD`: `mypy` and the database-free tests; a failure sends the agent back once, then CI is the gate |
+| Reviewer subagent runs Bash | `.claude/hooks/guard_readonly_bash.py` | Only read-only commands on an allowlist; anything else is denied |
 | `git commit`, `git push` | `permissions.ask` | Asks the human first (also for `git -C <dir> ...`) |
 
 ## Workflow for an agent
 
-1. Read the files you will touch and their tests before editing.
-2. Make the smallest change that fully solves the task; do not refactor unrelated code.
-3. Update tests, migrations and this file if a rule changes.
-4. Run the full check command. Report failures as they are; do not skip or `xfail` tests to pass.
-5. Commits: small, English, imperative (`Add monthly budget upsert`), one logical change each.
+1. **Design first.** A change that adds a table, a business rule, a resource, an endpoint or a
+   dependency starts with `/design-doc`
+   (`.claude/commands/design-doc.md`). No code until the human approves the document.
+2. Read the files you will touch and their tests before editing. New endpoints follow
+   `/new-endpoint` (`.claude/commands/new-endpoint.md`).
+3. Make the smallest change that fully solves the task; do not refactor unrelated code.
+4. Update tests, migrations and this file if a rule changes.
+5. Run the full check command. Report failures as they are; do not skip or `xfail` tests to pass.
+6. **Review, then repair.** Run the `reviewer` subagent (`.claude/agents/reviewer.md`) on the
+   change, fix the verified findings, say which ones you skipped and why, then run the full check
+   command again: repairs are code too.
+7. **Git only on request.** Commit and push only when the human asks. Commits: small, English,
+   imperative (`Add monthly budget upsert`), one logical change each, with a `Co-Authored-By`
+   trailer for the agent. Changes reach `main` only through a pull request the human merges (a GitHub ruleset requires a
+   PR with green CI and blocks force pushes).
